@@ -6,6 +6,10 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <thread>
+#include <cctype> // for std::isxdigit
+#include <string>
+
+#define DATA_BYTE 1024
 
 void handleClient(int client_fd, sockaddr_in client_addr);
 int initializeServer(int port);
@@ -25,7 +29,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    std::cout << "Server listening on port " << port << std::endl;
+    // std::cout << "Server listening on port " << port << std::endl;
 
     while (true)
     {
@@ -78,51 +82,118 @@ int initializeServer(int port)
     return server_fd;
 }
 
-void parseData(char buffer[], unsigned long long int num_bytes_read)
+void parseData(unsigned char buffer[], unsigned long long int num_bytes_read, char clientIP[], int clientPort)
 {
-    std::clog << "\nbyte: " << num_bytes_read << std::endl;
-    // Parse TYPE (2 bytes)
-    uint16_t type = (static_cast<unsigned int>(buffer[0]) << 8) | static_cast<unsigned int>(buffer[1]);
-    // std::cout << "\nConcatenated result: " << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << type << std::endl;
-    std::string type_str;
-    switch (type)
+    // std::clog << "\nbyte: " << num_bytes_read << " - ";
+
+    // // printing bytes
+    // for (int i = 0; i < num_bytes_read; ++i)
+    // {
+    //     std::clog << std::hex << std::setw(2) << std::setfill('0')
+    //               << (static_cast<unsigned>(buffer[i]) & 0xFF) << " ";
+    // }
+    // std::clog << std::endl;
+
+    int i = 0;
+
+    while (i < num_bytes_read - 1)
     {
-    case 0xE110:
-        type_str = "Hello";
-        break;
-    case 0xDA7A:
-        type_str = "Data";
-        break;
-    case 0x0B1E:
-        type_str = "Goodbye";
-        break;
-    default:
-        type_str = "Unknown";
-        break;
-    }
 
-    std::cout << type_str << std::endl;
+        // Parse TYPE (2 bytes)
+        int IdxTypeB1 = i;
+        int IdxTypeB2 = ++i;
 
-    // Parse TYPE (4 bytes)
-    uint32_t length = (static_cast<uint32_t>(buffer[2]) << 24) |
-                      (static_cast<uint32_t>(buffer[3]) << 16) |
-                      (static_cast<uint32_t>(buffer[4]) << 8) |
-                      static_cast<uint32_t>(buffer[5]);
+        uint16_t type = (static_cast<unsigned int>(buffer[IdxTypeB1]) << 8) | static_cast<unsigned int>(buffer[IdxTypeB2]);
+        // std::cout << "\nConcatenated result: " << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << type << std::endl;
+        std::string type_str;
+        switch (type)
+        {
+        case 0xE110:
+            type_str = "Hello";
+            break;
+        case 0xDA7A:
+            type_str = "Data";
+            break;
+        case 0x0B1E:
+            type_str = "Goodbye";
+            break;
+        default:
+            type_str = "Unknown";
+            break;
+        }
 
-    // std::cout << "Concatenated result for length: " << std::hex << std::uppercase << std::setw(8) << std::setfill('0') << length << std::endl;
-    std::cout << length << std::endl;
+        // if(type_str == "Unknown"){
+        //     break;
+        // }
 
-    int i = 6;
-    int offset = (length >= 4) ? 4 : length;
+        // std::cout << type_str << std::endl;
 
-    for (int j = i; j < i + offset; j++)
-    {
-        std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0')
-                  << (static_cast<unsigned>(buffer[j]) & 0xFF) << " ";
+        // Parse TYPE (4 bytes)
+        uint32_t IdxLenB1 = ++i;
+        uint32_t IdxLenB2 = ++i;
+        uint32_t IdxLenB3 = ++i;
+        uint32_t IdxLenB4 = ++i;
+
+        uint32_t length = (static_cast<uint32_t>(buffer[IdxLenB1]) << 24) |
+                          (static_cast<uint32_t>(buffer[IdxLenB2]) << 16) |
+                          (static_cast<uint32_t>(buffer[IdxLenB3]) << 8) |
+                          static_cast<uint32_t>(buffer[IdxLenB4]);
+
+        // std::cout << "Concatenated result for length: " << std::hex << std::uppercase << std::setw(8) << std::setfill('0') << length << std::endl;
+        // std::cout << length << std::endl;
+
+        // int i = 6;
+        int offset = (length >= 4) ? 4 : length;
+
+        //[127.0.0.1:5678] [Data] [5]
+        std::cout << "[" << clientIP << ":" << clientPort << "] " << "[" << type_str << "] " << "[" << length << "] ";
+        std::cout << "[";
+        for (int j = ++i; j < i + offset; j++)
+        {
+            std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0')
+                      << (static_cast<unsigned>(buffer[j]) & 0xFF);
+            std::cout.flush();
+
+            // keep print space between bytes
+            if (j < i + offset - 1)
+                std::cout << " ";
+        }
+
+        std::cout << "]" << std::endl;
 
         std::cout.flush();
+        // jumping to next BLOB
+        i = i + length;
+        // std::cout << "i: " << i << std::endl;
     }
 }
+// bool isHexDigit(char ch) {
+//     return (ch >= '0' && ch <= '9') ||
+//            (ch >= 'A' && ch <= 'F') ||
+//            (ch >= 'a' && ch <= 'f');
+// }
+
+// bool isHexString(const std::string &str)
+// {
+//     for (char c : str)
+//     {
+//         if (!isHexDigit(c))
+//         {
+//             return false;
+//         }
+//     }
+//     return true;
+// }
+
+// std::string bytesToHexString(const unsigned char *bytes, unsigned long long int length)
+// {
+//     std::ostringstream oss;
+//     for (int i = 0; i < length; ++i)
+//     {
+//         oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(bytes[i]);
+//     }
+//     return oss.str();
+// }
 
 void handleClient(int client_fd, sockaddr_in client_addr)
 {
@@ -130,16 +201,40 @@ void handleClient(int client_fd, sockaddr_in client_addr)
     inet_ntop(AF_INET, &(client_addr.sin_addr), clientIP, INET_ADDRSTRLEN);
     int clientPort = ntohs(client_addr.sin_port);
 
-    char buffer[1024] = {0};
+    unsigned char buffer[DATA_BYTE] = {0};
     unsigned long long int num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+
+    // std::clog << "Num of bytes read: " << num_bytes_read << std::endl;
+
+    // // Convert bytes to hex string
+    // std::string hexString = bytesToHexString(buffer, num_bytes_read);
+
+    // std::clog << "String byte size: " << hexString.size() << std::endl;
+
+    // if(num_bytes_read != hexString.size()/2){
+    //     std::cerr << "Error: Received data is not a valid hex string" << std::endl;
+
+    // }
+
+    // // Validate and display the hex string
+    // if (isHexString(hexString))
+    // {
+    //     std::cout << "Received Hex String: " << hexString << std::endl;
+    // }
+    // else
+    // {
+    //     std::cerr << "Error: Received data is not a valid hex string" << std::endl;
+    //     std::cout << "Received Hex String: " << hexString << std::endl;
+    // }
 
     while (num_bytes_read > 0)
     {
+
         buffer[num_bytes_read] = '\0'; // Ensure null-termination
 
-        std::cout << "Received message from " << clientIP << ":" << clientPort << " - " << buffer << std::endl;
+        // std::cout << "Received message from " << clientIP << ":" << clientPort << " - " << buffer << std::endl;
 
-        parseData(buffer, num_bytes_read);
+        parseData(buffer, num_bytes_read, clientIP, clientPort);
         std::cout << std::endl;
 
         num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
@@ -147,7 +242,7 @@ void handleClient(int client_fd, sockaddr_in client_addr)
 
     if (num_bytes_read == 0)
     {
-        std::cout << "Client disconnected: " << clientIP << ":" << static_cast<int>(clientPort) << std::endl;
+        std::cout << "Client disconnected: " << clientIP << ":" << clientPort << std::endl;
     }
     else
     {
