@@ -1,3 +1,10 @@
+/*
+References:
+https://www.geeksforgeeks.org/socket-programming-in-cpp/
+https://try.stackoverflow.co
+https://chatgpt.com
+*/
+
 #include <iostream>
 #include <iomanip>
 #include <cstring>
@@ -122,10 +129,6 @@ void parseData(unsigned char buffer[], unsigned long long int num_bytes_read, ch
             break;
         }
 
-        // if(type_str == "Unknown"){
-        //     break;
-        // }
-
         // std::cout << type_str << std::endl;
 
         // Parse TYPE (4 bytes)
@@ -167,33 +170,6 @@ void parseData(unsigned char buffer[], unsigned long long int num_bytes_read, ch
         // std::cout << "i: " << i << std::endl;
     }
 }
-// bool isHexDigit(char ch) {
-//     return (ch >= '0' && ch <= '9') ||
-//            (ch >= 'A' && ch <= 'F') ||
-//            (ch >= 'a' && ch <= 'f');
-// }
-
-// bool isHexString(const std::string &str)
-// {
-//     for (char c : str)
-//     {
-//         if (!isHexDigit(c))
-//         {
-//             return false;
-//         }
-//     }
-//     return true;
-// }
-
-// std::string bytesToHexString(const unsigned char *bytes, unsigned long long int length)
-// {
-//     std::ostringstream oss;
-//     for (int i = 0; i < length; ++i)
-//     {
-//         oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(bytes[i]);
-//     }
-//     return oss.str();
-// }
 
 void handleClient(int client_fd, sockaddr_in client_addr)
 {
@@ -204,28 +180,6 @@ void handleClient(int client_fd, sockaddr_in client_addr)
     unsigned char buffer[DATA_BYTE] = {0};
     unsigned long long int num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
 
-    // std::clog << "Num of bytes read: " << num_bytes_read << std::endl;
-
-    // // Convert bytes to hex string
-    // std::string hexString = bytesToHexString(buffer, num_bytes_read);
-
-    // std::clog << "String byte size: " << hexString.size() << std::endl;
-
-    // if(num_bytes_read != hexString.size()/2){
-    //     std::cerr << "Error: Received data is not a valid hex string" << std::endl;
-
-    // }
-
-    // // Validate and display the hex string
-    // if (isHexString(hexString))
-    // {
-    //     std::cout << "Received Hex String: " << hexString << std::endl;
-    // }
-    // else
-    // {
-    //     std::cerr << "Error: Received data is not a valid hex string" << std::endl;
-    //     std::cout << "Received Hex String: " << hexString << std::endl;
-    // }
 
     while (num_bytes_read > 0)
     {
