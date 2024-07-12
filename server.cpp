@@ -89,7 +89,7 @@ int initializeServer(int port)
     return server_fd;
 }
 
-void parseData(unsigned char buffer[], unsigned long long int num_bytes_read, char clientIP[], int clientPort)
+void parseData(char buffer[], unsigned long long int num_bytes_read, char clientIP[], int clientPort)
 {
     // std::clog << "\nbyte: " << num_bytes_read << " - ";
 
@@ -103,6 +103,7 @@ void parseData(unsigned char buffer[], unsigned long long int num_bytes_read, ch
 
     int i = 0;
 
+    //termination condition (1byte = 2 Hex)
     while (i < num_bytes_read - 1)
     {
 
@@ -149,13 +150,14 @@ void parseData(unsigned char buffer[], unsigned long long int num_bytes_read, ch
         int offset = (length >= 4) ? 4 : length;
 
         //[127.0.0.1:5678] [Data] [5]
-        std::cout << "[" << clientIP << ":" << clientPort << "] " << "[" << type_str << "] " << "[" << length << "] ";
+
+        std::cout << "[" << clientIP << ":" << std::to_string(clientPort) << "] " << "[" << type_str << "] " << "[" << length << "] ";
         std::cout << "[";
         for (int j = ++i; j < i + offset; j++)
         {
             std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0')
                       << (static_cast<unsigned>(buffer[j]) & 0xFF);
-            std::cout.flush();
+            // std::cout.flush();
 
             // keep print space between bytes
             if (j < i + offset - 1)
@@ -164,12 +166,13 @@ void parseData(unsigned char buffer[], unsigned long long int num_bytes_read, ch
 
         std::cout << "]" << std::endl;
 
-        std::cout.flush();
+        // std::cout.flush();
         // jumping to next BLOB
         i = i + length;
         // std::cout << "i: " << i << std::endl;
     }
 }
+
 
 void handleClient(int client_fd, sockaddr_in client_addr)
 {
@@ -177,7 +180,7 @@ void handleClient(int client_fd, sockaddr_in client_addr)
     inet_ntop(AF_INET, &(client_addr.sin_addr), clientIP, INET_ADDRSTRLEN);
     int clientPort = ntohs(client_addr.sin_port);
 
-    unsigned char buffer[DATA_BYTE] = {0};
+    char buffer[DATA_BYTE] = {0};
     unsigned long long int num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
 
 
@@ -186,7 +189,7 @@ void handleClient(int client_fd, sockaddr_in client_addr)
 
         buffer[num_bytes_read] = '\0'; // Ensure null-termination
 
-        // std::cout << "Received message from " << clientIP << ":" << clientPort << " - " << buffer << std::endl;
+        std::cout << "Received message from " << clientIP << ":" << clientPort << " - " << buffer << std::endl;
 
         parseData(buffer, num_bytes_read, clientIP, clientPort);
         std::cout << std::endl;
