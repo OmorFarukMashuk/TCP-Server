@@ -14,12 +14,14 @@ https://chatgpt.com
 #include <arpa/inet.h>
 #include <thread>
 #include <cctype> // for std::isxdigit
-#include <string>
+// #include <string>
 
 #define DATA_BYTE 1024
 
+void parseData(char buffer[], unsigned long long int num_bytes_read, char clientIP[], int clientPort);
 void handleClient(int client_fd, sockaddr_in client_addr);
 int initializeServer(int port);
+
 
 int main(int argc, char *argv[])
 {
@@ -89,21 +91,52 @@ int initializeServer(int port)
     return server_fd;
 }
 
+void handleClient(int client_fd, sockaddr_in client_addr)
+{
+    char clientIP[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(client_addr.sin_addr), clientIP, INET_ADDRSTRLEN);
+    int clientPort = ntohs(client_addr.sin_port);
+
+    char buffer[DATA_BYTE] = {0};
+    unsigned long long int num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+
+    while (num_bytes_read > 0)
+    {
+
+        buffer[num_bytes_read] = '\0'; // Ensure null-termination
+
+        std::clog << "Received data from " << clientIP << ":" << std::to_string(clientPort) << " - ";
+        // printing bytes
+        for (int i = 0; i < num_bytes_read; ++i)
+        {
+            std::clog << std::hex << std::setw(2) << std::setfill('0')
+                      << (static_cast<unsigned>(buffer[i]) & 0xFF) << " ";
+        }
+        std::clog << std::endl;
+        //     std::clog << "\ntotal bytes read: " << num_bytes_read << std::endl;
+
+        parseData(buffer, num_bytes_read, clientIP, clientPort);
+        std::cout << std::endl;
+
+        num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+    }
+
+    if (num_bytes_read == 0)
+    {
+        std::cout << "Client disconnected: " << clientIP << ":" << std::to_string(clientPort) << std::endl<< std::endl;
+    }
+    else
+    {
+        std::cerr << "Failed to receive data: " << strerror(errno) << std::endl;
+    }
+
+    close(client_fd);
+}
 void parseData(char buffer[], unsigned long long int num_bytes_read, char clientIP[], int clientPort)
 {
-    // std::clog << "\nbyte: " << num_bytes_read << " - ";
-
-    // // printing bytes
-    // for (int i = 0; i < num_bytes_read; ++i)
-    // {
-    //     std::clog << std::hex << std::setw(2) << std::setfill('0')
-    //               << (static_cast<unsigned>(buffer[i]) & 0xFF) << " ";
-    // }
-    // std::clog << std::endl;
-
     int i = 0;
 
-    //termination condition (1byte = 2 Hex)
+    // termination condition (1byte = 2 Hex)
     while (i < num_bytes_read - 1)
     {
 
@@ -173,38 +206,3 @@ void parseData(char buffer[], unsigned long long int num_bytes_read, char client
     }
 }
 
-
-void handleClient(int client_fd, sockaddr_in client_addr)
-{
-    char clientIP[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &(client_addr.sin_addr), clientIP, INET_ADDRSTRLEN);
-    int clientPort = ntohs(client_addr.sin_port);
-
-    char buffer[DATA_BYTE] = {0};
-    unsigned long long int num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-
-
-    while (num_bytes_read > 0)
-    {
-
-        buffer[num_bytes_read] = '\0'; // Ensure null-termination
-
-        std::cout << "Received message from " << clientIP << ":" << clientPort << " - " << buffer << std::endl;
-
-        parseData(buffer, num_bytes_read, clientIP, clientPort);
-        std::cout << std::endl;
-
-        num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-    }
-
-    if (num_bytes_read == 0)
-    {
-        std::cout << "Client disconnected: " << clientIP << ":" << clientPort << std::endl;
-    }
-    else
-    {
-        std::cerr << "Failed to receive data: " << strerror(errno) << std::endl;
-    }
-
-    close(client_fd);
-}
