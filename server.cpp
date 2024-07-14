@@ -44,7 +44,7 @@ public:
 
     void run()
     {
-        std::cout << "Server listening on port " << port << std::endl;
+        std::cout << "Server listening on port . . ." << port << std::endl;
         while (true)
         {
             sockaddr_in client_addr;
@@ -94,9 +94,9 @@ private:
 
         return fd;
     }
-    void parseData(char buffer[], unsigned long long int num_bytes_read, char clientIP[], int clientPort)
+    void parseData(char buffer[], unsigned long int num_bytes_read, char clientIP[], int clientPort)
     {
-        int i = 0;
+        unsigned long int i = 0;
 
         // termination condition (1byte = 2 Hex)
         while (i < num_bytes_read - 1)
@@ -129,16 +129,16 @@ private:
                 break;
             }
 
-            if(type_str == "Unknown"){
-            std::cout << "[" << clientIP << ":" << std::to_string(clientPort) << "] " << "[" << type_str << "] " << "[]" << "[Data Corruption Occurred] ";
-            break;
-
+            if (type_str == "Unknown")
+            {
+                std::cout << "[" << clientIP << ":" << std::to_string(clientPort) << "] " << "[" << type_str << "] " << "[]" << "[Data Corruption Occurred] ";
+                break;
             }
 
             // std::cout << type_str << std::endl;
 
             // Parse TYPE (4 bytes)
-            uint32_t IdxLenB1 = ++i;  
+            uint32_t IdxLenB1 = ++i;
             uint32_t IdxLenB2 = ++i;
             uint32_t IdxLenB3 = ++i;
             uint32_t IdxLenB4 = ++i;
@@ -149,8 +149,8 @@ private:
                               static_cast<uint32_t>(buffer[IdxLenB4]);
 
             // std::cout << "Concatenated result for length: " << std::hex << std::uppercase << std::setw(8) << std::setfill('0') << length << std::endl;
-            std::cout << length << std::endl;
-            
+            // std::cout << length << std::endl;
+
             // Ensure there's size of VALUE matches LENGTH
             // if (num_bytes_read - i +1 != static_cast<int>(length)) {
             //     std::cerr << "Invalid VALUE field from client: " << clientIP << ":" << std::to_string(clientPort) << std::endl;
@@ -186,8 +186,11 @@ private:
         inet_ntop(AF_INET, &(client_addr.sin_addr), clientIP, INET_ADDRSTRLEN);
         int clientPort = ntohs(client_addr.sin_port);
 
+        std::clog << "Client Connected: " << clientIP << ":" << std::to_string(clientPort) << std::endl;
+
         char buffer[DATA_BYTE] = {0};
         unsigned long int num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+
 
         while (num_bytes_read > 0)
         {
@@ -206,7 +209,7 @@ private:
             }
             std::clog << std::endl;
 
-            std::clog << "\ntotal bytes read: " << num_bytes_read << std::endl;
+            // std::clog << "\ntotal bytes read: " << num_bytes_read << std::endl;
 
             parseData(buffer, num_bytes_read, clientIP, clientPort);
 
@@ -228,7 +231,10 @@ private:
     bool checkRateLimit(const std::string &ip)
     {
         std::lock_guard<std::mutex> lock(rateMutex);
-        auto &[count, last_time] = rateLimiter[ip];
+        auto &count = std::get<0>(rateLimiter[ip]);
+        auto &last_time = std::get<1>(rateLimiter[ip]);
+
+        // auto &[count, last_time] = rateLimiter[ip];
         auto now = std::chrono::steady_clock::now();
         if (std::chrono::duration_cast<std::chrono::seconds>(now - last_time).count() < 10)
         {
