@@ -17,7 +17,7 @@ https://learn.microsoft.com/en-us/cpp/
 #include <chrono>
 #include <mutex>
 
-#define DATA_BYTE 1024
+#define DATA_BYTE 1030 // considering T - 2 BYTE, L - 4 BYTE, V - 1024 BYTE
 
 class TCPServer
 {
@@ -101,7 +101,11 @@ private:
         // termination condition (1byte = 2 Hex)
         while (i < num_bytes_read - 1)
         {
-
+            // Ensure there's enough data left for TYPE and LENGTH
+            // if (num_bytes_read - i < 6) {
+            //     std::cerr << "Incomplete TLV header from client: " << clientIP << ":" << clientPort << std::endl;
+            //     break;
+            // }
             // Parse TYPE (2 bytes)
             int IdxTypeB1 = i;
             int IdxTypeB2 = ++i;
@@ -125,10 +129,16 @@ private:
                 break;
             }
 
+            if(type_str == "Unknown"){
+            std::cout << "[" << clientIP << ":" << std::to_string(clientPort) << "] " << "[" << type_str << "] " << "[]" << "[Data Corruption Occurred] ";
+            break;
+
+            }
+
             // std::cout << type_str << std::endl;
 
             // Parse TYPE (4 bytes)
-            uint32_t IdxLenB1 = ++i;
+            uint32_t IdxLenB1 = ++i;  
             uint32_t IdxLenB2 = ++i;
             uint32_t IdxLenB3 = ++i;
             uint32_t IdxLenB4 = ++i;
@@ -139,20 +149,23 @@ private:
                               static_cast<uint32_t>(buffer[IdxLenB4]);
 
             // std::cout << "Concatenated result for length: " << std::hex << std::uppercase << std::setw(8) << std::setfill('0') << length << std::endl;
-            // std::cout << length << std::endl;
+            std::cout << length << std::endl;
+            
+            // Ensure there's size of VALUE matches LENGTH
+            // if (num_bytes_read - i +1 != static_cast<int>(length)) {
+            //     std::cerr << "Invalid VALUE field from client: " << clientIP << ":" << std::to_string(clientPort) << std::endl;
+            //     break;
+            // }
 
+            // Parse VALUE
             // int i = 6;
             int offset = (length >= 4) ? 4 : length;
-
-            //[127.0.0.1:5678] [Data] [5]
-
             std::cout << "[" << clientIP << ":" << std::to_string(clientPort) << "] " << "[" << type_str << "] " << "[" << length << "] ";
             std::cout << "[";
             for (int j = ++i; j < i + offset; j++)
             {
                 std::cout << "0x" << std::hex << std::setw(2) << std::setfill('0')
                           << (static_cast<unsigned>(buffer[j]) & 0xFF);
-                // std::cout.flush();
 
                 // keep print space between bytes
                 if (j < i + offset - 1)
@@ -161,7 +174,6 @@ private:
 
             std::cout << "]" << std::endl;
 
-            // std::cout.flush();
             // jumping to next BLOB
             i = i + length;
             // std::cout << "i: " << i << std::endl;
@@ -175,7 +187,7 @@ private:
         int clientPort = ntohs(client_addr.sin_port);
 
         char buffer[DATA_BYTE] = {0};
-        unsigned long long int num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
+        unsigned long int num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
 
         while (num_bytes_read > 0)
         {
@@ -187,12 +199,15 @@ private:
                 break; // Disconnect client
             }
 
-            std::clog << "Received data from " << clientIP << ":" << clientPort << " - ";
+            std::clog << "Received data from " << clientIP << ":" << std::to_string(clientPort) << " - ";
             for (int i = 0; i < num_bytes_read; ++i)
             {
                 std::clog << std::hex << std::setw(2) << std::setfill('0') << (static_cast<unsigned>(buffer[i]) & 0xFF) << " ";
             }
             std::clog << std::endl;
+
+            std::clog << "\ntotal bytes read: " << num_bytes_read << std::endl;
+
             parseData(buffer, num_bytes_read, clientIP, clientPort);
 
             num_bytes_read = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
@@ -218,7 +233,7 @@ private:
         if (std::chrono::duration_cast<std::chrono::seconds>(now - last_time).count() < 10)
         {
             if (++count > 2)
-            { // Allow max 5 requests per second per client
+            { // Allow max  requests per second per client
                 return false;
             }
         }
