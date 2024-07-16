@@ -9,8 +9,8 @@ https://learn.microsoft.com/en-us/cpp/
 
 TCPServer::TCPServer(int port) : port(port)
 {
-    server_fd = initializeServer();
-    if (server_fd < 0)
+    this->server_fd = initializeServer();
+    if (this->server_fd < 0)
     {
         throw std::runtime_error("Server initialization failed");
     }
@@ -18,7 +18,7 @@ TCPServer::TCPServer(int port) : port(port)
 
 TCPServer::~TCPServer()
 {
-    close(server_fd);
+    close(this->server_fd);
 }
 
 void TCPServer::run()
@@ -35,7 +35,7 @@ void TCPServer::run()
             continue;
         }
 
-        //Using thread to handle each client connection concurrently
+        // Using thread to handle each client connection concurrently
         std::thread([=]
                     { handleClient(client_fd, client_addr); })
             .detach();
@@ -52,7 +52,7 @@ int TCPServer::initializeServer()
         return -1;
     }
 
-    // Set socket options and Bind the socket to the network address and port
+    // Set socket options and bind the socket to the network address and port
     sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
@@ -77,7 +77,7 @@ int TCPServer::initializeServer()
     return fd;
 }
 
-void TCPServer::parseData(char buffer[], unsigned int num_bytes_read, char clientIP[], int clientPort)
+void TCPServer::parseData(char buffer[], unsigned int num_bytes_read, char client_IP[], int client_port)
 {
     unsigned int i = 0;
 
@@ -88,7 +88,11 @@ void TCPServer::parseData(char buffer[], unsigned int num_bytes_read, char clien
         int idx_type_b1 = i;
         int idx_type_b2 = ++i;
 
-        uint16_t type = (static_cast<unsigned int>(buffer[idx_type_b1]) << 8) | static_cast<unsigned int>(buffer[idx_type_b2]);
+        uint16_t type = (static_cast<unsigned int>(buffer[idx_type_b1]) << 8) | // Take the byte at idx_type_b1, convert it to uint16_t,
+                                                                                // and shift left by 8 bits to place it in the highest byte
+                        static_cast<unsigned int>(buffer[idx_type_b2]);         // Take the byte at idx_type_b2, convert it to uint16_t,
+                                                                                // and place it in the lowest byte
+
         // std::clog << "\nConcatenated result: " << std::hex << std::uppercase << std::setw(4) << std::setfill('0') << type << std::endl;
         std::string type_str;
         switch (type)
@@ -110,7 +114,7 @@ void TCPServer::parseData(char buffer[], unsigned int num_bytes_read, char clien
         // Checking data corruption
         if (type_str == "Unknown")
         {
-            std::cerr << "[" << clientIP << ":" << std::to_string(clientPort) << "] " << "[" << type_str << "] " << "[]" << "[Data Corruption Occurred]" << std::endl;
+            std::cerr << "[" << client_IP << ":" << std::to_string(client_port) << "] " << "[" << type_str << "] " << "[]" << "[Data Corruption Occurred]" << std::endl;
             break;
         }
 
@@ -139,7 +143,7 @@ void TCPServer::parseData(char buffer[], unsigned int num_bytes_read, char clien
 
         // Parse VALUE
         int offset = (length >= BYTES_TO_READ) ? BYTES_TO_READ : length;
-        std::cout << "[" << clientIP << ":" << std::to_string(clientPort) << "] " << "[" << type_str << "] " << "[" << length << "] ";
+        std::cout << "[" << client_IP << ":" << std::to_string(client_port) << "] " << "[" << type_str << "] " << "[" << length << "] ";
         std::cout << "[";
         for (int j = ++i; j < i + offset; j++)
         {
@@ -179,9 +183,14 @@ void TCPServer::handleClient(int client_fd, sockaddr_in client_addr)
     {
         buffer[num_bytes_read] = '\0'; // Ensure null-termination
 
-        if (!checkRateLimit(client_IP))
+        std::string client_port_str = std::to_string(client_port);
+        std::string client_IP_str = client_IP;
+
+        std::string full_ip = client_IP_str + ": " + client_port_str;
+
+        if (!checkRateLimit(full_ip))
         {
-            std::cerr << "Rate limit exceeded for: " << client_IP << std::endl;
+            std::cerr << "Rate limit exceeded for: " << client_IP << ":" << client_port_str << std::endl;
             break; // Disconnect client
         }
 
@@ -213,17 +222,18 @@ void TCPServer::handleClient(int client_fd, sockaddr_in client_addr)
 
 bool TCPServer::checkRateLimit(const std::string &ip)
 {
-    int time_interval_in_sec = 5;
-    int max_one_usr_req_per_interval = 2;
 
     std::lock_guard<std::mutex> lock(rate_mutex);
-    auto &count = std::get<0>(rate_limiter[ip]);
-    auto &last_time = std::get<1>(rate_limiter[ip]);
+    
+    int time_interval_in_sec = 10;
+    int max_req_per_interval_per_usr = 2;
+    auto &count = std::get<0>(client_rate_limit[ip]);
+    auto &last_time = std::get<1>(client_rate_limit[ip]);
 
     auto now = std::chrono::steady_clock::now();
     if (std::chrono::duration_cast<std::chrono::seconds>(now - last_time).count() < time_interval_in_sec)
     {
-        if (++count > max_one_usr_req_per_interval)
+        if (++count > max_req_per_interval_per_usr)
         {
             return false;
         }
@@ -233,5 +243,6 @@ bool TCPServer::checkRateLimit(const std::string &ip)
         count = 1;
         last_time = now;
     }
+
     return true;
 }

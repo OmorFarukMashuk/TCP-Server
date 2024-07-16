@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
     }
     int port = std::stoi(argv[1]);
 
-    //running the server in side try-catch block so it doesn't crash
+    // running the server in side try-catch block so it doesn't crash
     try
     {
         TCPServer server(port);

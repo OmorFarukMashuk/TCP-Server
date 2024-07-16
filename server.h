@@ -9,8 +9,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <string>
 #include <thread>
 #include <unordered_map>
+#include <map>
 #include <chrono>
 #include <mutex>
 
@@ -22,8 +24,11 @@ class TCPServer
 private:
     int port;
     int server_fd;
-    std::unordered_map<std::string, std::pair<int, std::chrono::steady_clock::time_point>> rate_limiter;
-    std::mutex rate_mutex; // Used to ensure that the rate limit checking and updating are thread-safe,
+    std::unordered_map<std::string, std::pair<int, std::chrono::steady_clock::time_point>> client_rate_limit; // This map tracks the number of requests (int) and
+                                                                                                              // the last time (std::chrono::steady_clock::time_point) we recorded a request for each client IP.
+                                                                                                              // The std::string key represents the client's IP address
+
+    std::mutex rate_mutex; // Ensuring the rate limit checking and updating are thread-safe,
                            // preventing race conditions when multiple threads try to update the map simultaneously
 
 public:
@@ -40,8 +45,8 @@ private:
     // Handles a client connection
     void handleClient(int client_fd, sockaddr_in client_addr);
     // Parses the received data, print the output according to given format
-    void parseData(char buffer[], unsigned int num_bytes_read, char clientIP[], int clientPort);
-    // Checks how much time has passed since the last recorded request from the given IP
+    void parseData(char buffer[], unsigned int num_bytes_read, char client_IP[], int client_port);
+    // Checks how much time has passed since the last recorded request from the specific IP
     bool checkRateLimit(const std::string &ip);
 };
 
